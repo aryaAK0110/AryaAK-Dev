@@ -72,6 +72,10 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 input[type=range]{width:100%}
 .note{font-size:.95rem;color:var(--muted);margin:.5rem 0}
 .err{font-size:.95rem;color:#C0392B;margin:.5rem 0}
+.chat{max-height:42vh;overflow:auto;display:flex;flex-direction:column;gap:.5rem;margin-bottom:.8rem;padding:.2rem}
+.msg{max-width:85%;padding:.5rem .8rem;border-radius:14px;font-size:1rem;line-height:1.45;background:var(--card);border:1px solid var(--line);align-self:flex-start;white-space:pre-wrap;overflow-wrap:anywhere}
+.msg.me{align-self:flex-end;background:#FFC53D;color:#1C2541;border-color:transparent}
+.msg small{display:block;font-family:"Bricolage Grotesque",system-ui,sans-serif;font-size:.7rem;opacity:.7;margin-bottom:.15rem}
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(1rem + env(safe-area-inset-bottom,0px));z-index:60;max-width:90%;background:var(--ink);color:var(--bg);padding:.6rem 1rem;border-radius:12px;font-family:"Bricolage Grotesque",system-ui,sans-serif;font-size:.9rem}
 </style>
 </head>
@@ -263,10 +267,35 @@ function renderReq(){
       STATUS.forEach(s=>{const o=mk('option','',s);o.value=s;if(s===r.status)o.selected=true;sel.appendChild(o)});
       sel.onchange=()=>updateDoc(doc(db,'requests',r.id),{status:sel.value}).catch(e=>toast('Gagal: '+(e.code||e.message)));
       const x=mk('button','mini','Hapus');x.type='button';x.onclick=()=>{if(x.dataset.s){deleteDoc(doc(db,'requests',r.id)).catch(()=>{})}else{x.dataset.s=1;x.textContent='Yakin? Ketuk lagi'}};
-      row.append(sel,x);
-    }else row.appendChild(mk('span','chip',r.status||'baru'));
+      row.append(sel,chatBtn(r),x);
+    }else{row.appendChild(mk('span','chip',r.status||'baru'));row.appendChild(chatBtn(r))}
     d.appendChild(row);box.appendChild(d);
   });
+}
+function chatBtn(r){const b=mk('button','mini','Chat');b.type='button';b.onclick=()=>openChat(r);return b}
+function openChat(r){
+  const body=mk('div'),list=mk('div','chat'),f=field('Tulis pesan','',true),err=mk('p','err','');
+  body.append(list,f,err);
+  let un=null;const stop=()=>{if(un){un();un=null}};
+  un=onSnapshot(query(collection(db,'requests',r.id,'messages'),orderBy('createdAt')),s=>{
+    list.textContent='';
+    if(s.empty)list.appendChild(mk('p','note','Belum ada pesan. Mulai percakapan di bawah.'));
+    s.docs.forEach(d=>{
+      const m=d.data(),mine=DEV?m.role==='dev':m.role==='user',b=mk('div','msg'+(mine?' me':''));
+      b.appendChild(mk('small','',m.role==='dev'?'Admin':(r.name||'Pengunjung')));
+      b.appendChild(document.createTextNode(m.text));list.appendChild(b);
+    });
+    list.scrollTop=list.scrollHeight;
+  },e=>{err.textContent='Gagal memuat chat: '+(e.code||e.message)});
+  openSheet({title:'Chat request',body,ok:'Kirim',cancelLabel:'Tutup',noFocus:true,onCancel:stop,
+    onOk(){
+      const t=f.input.value.trim();if(!t)return false;
+      if(t.length>1000){err.textContent='Pesan terlalu panjang (maksimal 1000 huruf).';return false}
+      err.textContent='';sOk.disabled=true;
+      addDoc(collection(db,'requests',r.id,'messages'),{uid:U.uid,role:DEV?'dev':'user',text:t,createdAt:serverTimestamp()})
+        .then(()=>{f.input.value='';sOk.disabled=false}).catch(e=>{sOk.disabled=false;err.textContent='Gagal mengirim: '+(e.code||e.message)});
+      return false;
+    }});
 }
 function renderAll(){renderTexts();renderPhoto();renderProjects();renderContacts();renderReq()}
 
