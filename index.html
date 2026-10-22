@@ -76,12 +76,18 @@ input[type=range]{width:100%}
 .msg{max-width:85%;padding:.5rem .8rem;border-radius:14px;font-size:1rem;line-height:1.45;background:var(--card);border:1px solid var(--line);align-self:flex-start;white-space:pre-wrap;overflow-wrap:anywhere}
 .msg.me{align-self:flex-end;background:#FFC53D;color:#1C2541;border-color:transparent}
 .msg small{display:block;font-family:"Bricolage Grotesque",system-ui,sans-serif;font-size:.7rem;opacity:.7;margin-bottom:.15rem}
+.bell{position:relative;display:inline-grid;place-items:center;width:2.2rem;height:2.2rem;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer;padding:0}
+.dot{position:absolute;top:-.35rem;right:-.35rem;min-width:1.15rem;height:1.15rem;padding:0 .25rem;border-radius:999px;background:#E5484D;color:#fff;font-size:.7rem;font-weight:700;display:grid;place-items:center}
+.ni{display:block;width:100%;text-align:left;font:inherit;font-size:1rem;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:.7rem .9rem;margin-bottom:.6rem;cursor:pointer}
+.ni.unread{border-color:#FFC53D;box-shadow:inset 3px 0 0 #FFC53D}
+.ni small{display:block;font-family:"Bricolage Grotesque",system-ui,sans-serif;font-size:.75rem;color:var(--muted);margin-top:.2rem}
+.chip.new{background:#E5484D;color:#fff;margin-left:.3rem}
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(1rem + env(safe-area-inset-bottom,0px));z-index:60;max-width:90%;background:var(--ink);color:var(--bg);padding:.6rem 1rem;border-radius:12px;font-family:"Bricolage Grotesque",system-ui,sans-serif;font-size:.9rem}
 </style>
 </head>
 <body>
 <main>
-  <div class="top"><span class="badge dev-only">Mode Dev</span><span id="who"></span><button class="mini" id="auth" type="button">Masuk dengan Google</button></div>
+  <div class="top"><span class="badge dev-only">Mode Dev</span><button class="bell" id="bell" type="button" aria-label="Notifikasi" hidden><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><span class="dot" id="dot" hidden></span></button><span id="who"></span><button class="mini" id="auth" type="button">Masuk dengan Google</button></div>
   <header>
     <button class="avatar" id="avatar" type="button" aria-label="Foto profil"><img id="avatarImg" alt="" hidden><span id="avatarPh">+ Foto</span></button>
     <h1 data-k="name"></h1>
@@ -154,7 +160,7 @@ const mk=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!==u
 const safeHref=h=>{h=(h||'').trim();if(!h)return '#';return /^(https?:|mailto:|tel:)/i.test(h)?h:'https://'+h};
 function toast(m){const t=$('toast');t.textContent=m;t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>t.hidden=true,3500)}
 
-let S=clone(DEF),P=[],U=null,DEV=false,REQ=[],unReq=null;
+let S=clone(DEF),P=[],U=null,DEV=false,REQ=[],unReq=null,NOTES=[],unNote=null;
 
 /* data */
 function norm(d){const x=clone(DEF);x.texts=Object.assign(x.texts,d.texts||{});x.contacts=d.contacts||x.contacts;x.photo=d.photo||'';return x}
@@ -168,7 +174,7 @@ async function login(){try{await signInWithPopup(auth,provider)}catch(e){if(e.co
 $('auth').onclick=()=>U?signOut(auth):login();
 onAuthStateChanged(auth,async u=>{
   U=u;DEV=false;
-  if(unReq){unReq();unReq=null}REQ=[];
+  if(unReq){unReq();unReq=null}REQ=[];if(unNote){unNote();unNote=null}NOTES=[];
   if(u){try{await getDoc(doc(db,'admin','check'));DEV=true}catch(e){}}
   document.body.classList.toggle('dev',DEV);
   $('who').textContent=u?(u.displayName||u.email):'';
@@ -176,8 +182,14 @@ onAuthStateChanged(auth,async u=>{
   if(u){
     const q=DEV?query(collection(db,'requests'),orderBy('createdAt','desc')):query(collection(db,'requests'),where('uid','==',u.uid));
     unReq=onSnapshot(q,s=>{REQ=s.docs.map(d=>Object.assign({id:d.id},d.data()));if(!DEV)REQ.sort((a,b)=>((b.createdAt&&b.createdAt.seconds)||0)-((a.createdAt&&a.createdAt.seconds)||0));renderReq()},()=>{});
+    unNote=onSnapshot(query(collection(db,'notifications'),where('to','==',DEV?'dev':u.uid)),s=>{
+      NOTES=s.docs.map(d=>Object.assign({id:d.id},d.data()));
+      NOTES.sort((a,b)=>((b.createdAt&&b.createdAt.seconds)||0)-((a.createdAt&&a.createdAt.seconds)||0));
+      renderNotes();
+    },()=>{});
   }
   renderAll();
+  renderNotes();
 });
 
 /* sheet */
@@ -265,15 +277,46 @@ function renderReq(){
     if(DEV){
       const sel=document.createElement('select');sel.setAttribute('aria-label','Status');
       STATUS.forEach(s=>{const o=mk('option','',s);o.value=s;if(s===r.status)o.selected=true;sel.appendChild(o)});
-      sel.onchange=()=>updateDoc(doc(db,'requests',r.id),{status:sel.value}).catch(e=>toast('Gagal: '+(e.code||e.message)));
+      sel.onchange=()=>updateDoc(doc(db,'requests',r.id),{status:sel.value}).then(()=>{
+        const t={dibayar:'Pembayaranmu sudah dikonfirmasi.',diproses:'Pesananmu sedang diproses.',selesai:'Pesananmu sudah selesai! Terima kasih.'}[sel.value];
+        if(t)notify(r.uid,r.id,t);
+      }).catch(e=>toast('Gagal: '+(e.code||e.message)));
       const x=mk('button','mini','Hapus');x.type='button';x.onclick=()=>{if(x.dataset.s){deleteDoc(doc(db,'requests',r.id)).catch(()=>{})}else{x.dataset.s=1;x.textContent='Yakin? Ketuk lagi'}};
       row.append(sel,chatBtn(r),x);
     }else{row.appendChild(mk('span','chip',r.status||'baru'));row.appendChild(chatBtn(r))}
-    d.appendChild(row);box.appendChild(d);
+    if(NOTES.some(n=>!n.read&&n.reqId===r.id))row.appendChild(mk('span','chip new','Baru'));d.appendChild(row);box.appendChild(d);
   });
 }
+const BASE_TITLE=document.title;
+function notify(to,reqId,text){
+  if(!U)return;
+  addDoc(collection(db,'notifications'),{to,from:U.uid,reqId,text:String(text).slice(0,200),read:false,createdAt:serverTimestamp()}).catch(()=>{});
+}
+function markRead(n){updateDoc(doc(db,'notifications',n.id),{read:true}).catch(()=>{})}
+function markReqRead(id){NOTES.filter(n=>!n.read&&n.reqId===id).forEach(markRead)}
+function renderNotes(){
+  const un=NOTES.filter(n=>!n.read).length,dot=$('dot');
+  $('bell').hidden=!U;dot.hidden=!un;dot.textContent=un>9?'9+':un;
+  document.title=(un?'('+un+') ':'')+BASE_TITLE;
+  renderReq();
+}
+function openNotes(){
+  const body=mk('div');
+  if(!NOTES.length)body.appendChild(mk('p','note','Belum ada pemberitahuan.'));
+  NOTES.slice(0,40).forEach(n=>{
+    const b=mk('button','ni'+(n.read?'':' unread'),n.text);b.type='button';
+    const when=n.createdAt&&n.createdAt.toDate?n.createdAt.toDate().toLocaleString('id-ID'):'';
+    b.appendChild(mk('small','',when));
+    b.onclick=()=>{markRead(n);const r=REQ.find(x=>x.id===n.reqId);if(r)openChat(r);else closeSheet()};
+    body.appendChild(b);
+  });
+  openSheet({title:'Pemberitahuan',body,ok:'Tandai semua dibaca',cancelLabel:'Tutup',noFocus:true,
+    onOk(){NOTES.filter(n=>!n.read).forEach(markRead);return false}});
+}
+$('bell').onclick=openNotes;
 function chatBtn(r){const b=mk('button','mini','Chat');b.type='button';b.onclick=()=>openChat(r);return b}
 function openChat(r){
+  markReqRead(r.id);
   const body=mk('div'),list=mk('div','chat'),f=field('Tulis pesan','',true),err=mk('p','err','');
   body.append(list,f,err);
   let un=null;const stop=()=>{if(un){un();un=null}};
@@ -286,6 +329,7 @@ function openChat(r){
       b.appendChild(document.createTextNode(m.text));list.appendChild(b);
     });
     list.scrollTop=list.scrollHeight;
+    markReqRead(r.id);
   },e=>{err.textContent='Gagal memuat chat: '+(e.code||e.message)});
   openSheet({title:'Chat request',body,ok:'Kirim',cancelLabel:'Tutup',noFocus:true,onCancel:stop,
     onOk(){
@@ -293,7 +337,9 @@ function openChat(r){
       if(t.length>1000){err.textContent='Pesan terlalu panjang (maksimal 1000 huruf).';return false}
       err.textContent='';sOk.disabled=true;
       addDoc(collection(db,'requests',r.id,'messages'),{uid:U.uid,role:DEV?'dev':'user',text:t,createdAt:serverTimestamp()})
-        .then(()=>{f.input.value='';sOk.disabled=false}).catch(e=>{sOk.disabled=false;err.textContent='Gagal mengirim: '+(e.code||e.message)});
+        .then(()=>{f.input.value='';sOk.disabled=false;
+          if(DEV)notify(r.uid,r.id,'Admin membalas: '+t.slice(0,80));else notify('dev',r.id,(r.name||'Pengunjung')+': '+t.slice(0,80));
+        }).catch(e=>{sOk.disabled=false;err.textContent='Gagal mengirim: '+(e.code||e.message)});
       return false;
     }});
 }
@@ -353,7 +399,7 @@ $('vipBtn').onclick=()=>{
       if(text.length>1000){err.textContent='Request terlalu panjang (maksimal 1000 huruf).';return false}
       sOk.disabled=true;
       addDoc(collection(db,'requests'),{uid:U.uid,name:name.slice(0,80),email:U.email||'',text,status:'baru',createdAt:serverTimestamp()})
-        .then(()=>vipDone(text)).catch(e=>{sOk.disabled=false;err.textContent='Gagal mengirim: '+(e.code||e.message)});
+        .then(ref=>{notify('dev',ref.id,'Request baru dari '+name+': '+text.slice(0,80));vipDone(text)}).catch(e=>{sOk.disabled=false;err.textContent='Gagal mengirim: '+(e.code||e.message)});
       return false;
     }});
 };
