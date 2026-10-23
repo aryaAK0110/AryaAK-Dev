@@ -102,6 +102,14 @@ a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,
 input[type=range]{width:100%}
 .note{font-size:.95rem;color:var(--muted);margin:.5rem 0}
 .err{font-size:.95rem;color:#C0392B;margin:.5rem 0}
+.stars{font-size:1.1rem;letter-spacing:.1em;color:#E8A800}
+.rev{margin-top:.7rem;padding:.7rem .9rem;border:1px dashed var(--line);border-radius:10px;font-size:1rem}
+.rev p{margin:.3rem 0 .6rem}
+.chip.rated{background:#FFC53D;color:#1C2541}
+.note-s{font-family:"Bricolage Grotesque",system-ui,sans-serif;font-size:.8rem;color:var(--muted)}
+.starpick{display:flex;gap:.3rem;margin:.4rem 0 1rem}
+.star{font-size:2rem;line-height:1;background:transparent;border:0;color:var(--muted);cursor:pointer;padding:.1rem .2rem}
+.star.on{color:#E8A800}
 .chat{max-height:42vh;overflow:auto;display:flex;flex-direction:column;gap:.5rem;margin-bottom:.8rem;padding:.2rem}
 .msg{max-width:85%;padding:.5rem .8rem;border-radius:14px;font-size:1rem;line-height:1.45;background:var(--card);border:1px solid var(--line);align-self:flex-start;white-space:pre-wrap;overflow-wrap:anywhere}
 .msg.me{align-self:flex-end;background:#FFC53D;color:#1C2541;border-color:transparent}
@@ -134,6 +142,7 @@ input[type=range]{width:100%}
   </section>
   <section id="testiSec" hidden>
     <h2 data-k="testiH"></h2>
+    <p class="note" id="avg" hidden></p>
     <div class="grid" id="testi"></div>
     <button class="mini add dev-only" id="addTesti" type="button">+ Tambah testimoni</button>
   </section>
@@ -145,9 +154,11 @@ input[type=range]{width:100%}
       <div class="pkgs" id="pkgs"></div>
       <button class="mini add dev-only" id="addPkg" type="button" style="margin:0 0 1rem">+ Tambah paket</button>
       <p class="pay"><span class="sans">Pembayaran:</span> <span data-k="vipPay"></span></p>
+      <p class="note" id="closedNote" hidden>Request sedang ditutup. Silakan cek lagi nanti.</p>
       <div class="row">
         <button class="main-btn" id="vipBtn" type="button">Request VIP</button>
         <button class="mini dev-only" id="vipSet" type="button">Atur nomor WhatsApp</button>
+        <button class="mini dev-only" id="openToggle" type="button"></button>
       </div>
     </div>
   </section>
@@ -199,13 +210,14 @@ const mk=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!==u
 const safeHref=h=>{h=(h||'').trim();if(!h)return '#';return /^(https?:|mailto:|tel:)/i.test(h)?h:'https://'+h};
 function toast(m){const t=$('toast');t.textContent=m;t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>t.hidden=true,3500)}
 
-let FILTER='semua',S=clone(DEF),P=[],U=null,DEV=false,REQ=[],unReq=null,NOTES=[],unNote=null;
+let FILTER='semua',S=clone(DEF),P=[],U=null,DEV=false,REQ=[],unReq=null,NOTES=[],unNote=null,REV=[],PUB=[],unRev=null;
 
 /* data */
-function norm(d){const x=clone(DEF);x.texts=Object.assign(x.texts,d.texts||{});x.contacts=d.contacts||x.contacts;x.photo=d.photo||'';x.cover=d.cover||'';x.packages=Array.isArray(d.packages)?d.packages:[];x.testi=Array.isArray(d.testi)?d.testi:[];return x}
+function norm(d){const x=clone(DEF);x.texts=Object.assign(x.texts,d.texts||{});x.contacts=d.contacts||x.contacts;x.photo=d.photo||'';x.cover=d.cover||'';x.open=d.open!==false;x.packages=Array.isArray(d.packages)?d.packages:[];x.testi=Array.isArray(d.testi)?d.testi:[];return x}
 async function saveMain(){try{await setDoc(doc(db,'site','main'),S)}catch(e){toast('Gagal menyimpan: '+(e.code||e.message))}}
-onSnapshot(doc(db,'site','main'),s=>{S=s.exists()?norm(s.data()):clone(DEF);renderTexts();renderPhoto();renderCover();renderPkgs();renderTesti();renderContacts()},()=>{});
+onSnapshot(doc(db,'site','main'),s=>{S=s.exists()?norm(s.data()):clone(DEF);renderTexts();renderPhoto();renderCover();renderPkgs();renderOpen();renderTesti();renderContacts()},()=>{});
 onSnapshot(query(collection(db,'projects'),orderBy('order')),s=>{P=s.docs.map(d=>Object.assign({id:d.id},d.data()));renderProjects()},()=>{});
+onSnapshot(query(collection(db,'reviews'),where('show','==',true)),s=>{PUB=s.docs.map(d=>Object.assign({id:d.id},d.data()));PUB.sort((a,b)=>((b.createdAt&&b.createdAt.seconds)||0)-((a.createdAt&&a.createdAt.seconds)||0));renderTesti()},()=>{});
 
 /* auth */
 const provider=new GoogleAuthProvider();
@@ -213,7 +225,7 @@ async function login(){try{await signInWithPopup(auth,provider)}catch(e){if(e.co
 $('auth').onclick=()=>U?signOut(auth):login();
 onAuthStateChanged(auth,async u=>{
   U=u;DEV=false;
-  if(unReq){unReq();unReq=null}REQ=[];if(unNote){unNote();unNote=null}NOTES=[];
+  if(unReq){unReq();unReq=null}REQ=[];if(unNote){unNote();unNote=null}NOTES=[];if(unRev){unRev();unRev=null}REV=[];
   if(u){try{await getDoc(doc(db,'admin','check'));DEV=true}catch(e){}}
   document.body.classList.toggle('dev',DEV);
   $('who').textContent=u?(u.displayName||u.email):'';
@@ -226,6 +238,7 @@ onAuthStateChanged(auth,async u=>{
       NOTES.sort((a,b)=>((b.createdAt&&b.createdAt.seconds)||0)-((a.createdAt&&a.createdAt.seconds)||0));
       renderNotes();
     },()=>{});
+    unRev=onSnapshot(DEV?query(collection(db,'reviews')):query(collection(db,'reviews'),where('uid','==',u.uid)),s=>{REV=s.docs.map(d=>Object.assign({id:d.id},d.data()));renderReq()},()=>{});
   }
   renderAll();
   renderNotes();
@@ -314,6 +327,13 @@ function renderProjects(){
     box.appendChild(a);
   });
 }
+function renderOpen(){
+  const open=S.open!==false,b=$('vipBtn');
+  b.disabled=!open&&!DEV;
+  b.textContent=open?'Request VIP':(DEV?'Request VIP (ditutup)':'Request ditutup');
+  $('closedNote').hidden=open;
+  $('openToggle').textContent=open?'Tutup request':'Buka request';
+}
 function renderPkgs(){
   const box=$('pkgs');box.textContent='';
   const vp=document.querySelector('p.price');if(vp)vp.hidden=S.packages.length>0;
@@ -323,7 +343,7 @@ function renderPkgs(){
     c.append(mk('h3','',p.n),mk('p','pp',p.p));
     if(p.t)c.appendChild(mk('span','chip',p.t));
     if(p.d)c.appendChild(mk('p','pd',p.d));
-    const b=mk('button','main-btn sm','Pilih');b.type='button';b.onclick=e=>{e.stopPropagation();openVip(i)};c.appendChild(b);
+    const b=mk('button','main-btn sm','Pilih');b.type='button';b.disabled=S.open===false&&!DEV;b.onclick=e=>{e.stopPropagation();openVip(i)};c.appendChild(b);
     c.addEventListener('click',()=>{if(DEV)openPkg(i)});
     c.addEventListener('keydown',e=>{if(DEV&&e.key==='Enter'&&e.target===c)openPkg(i)});
     box.appendChild(c);
@@ -339,7 +359,10 @@ function renderTesti(){
     c.addEventListener('keydown',e=>{if(DEV&&e.key==='Enter'&&e.target===c)openTesti(i)});
     box.appendChild(c);
   });
-  $('testiSec').hidden=!S.testi.length&&!DEV;
+  PUB.forEach(x=>{const c=mk('figure','tcard');c.appendChild(mk('div','stars',stars(x.rating)));if(x.text)c.appendChild(mk('blockquote','',x.text));c.appendChild(mk('figcaption','',x.name));box.appendChild(c)});
+  const avg=$('avg');avg.hidden=!PUB.length;
+  if(PUB.length)avg.textContent='★ '+(PUB.reduce((s,x)=>s+(+x.rating||0),0)/PUB.length).toFixed(1)+' dari 5 · '+PUB.length+' ulasan';
+  $('testiSec').hidden=!S.testi.length&&!PUB.length&&!DEV;
 }
 function renderContacts(){
   const ul=$('contacts');ul.textContent='';
@@ -379,8 +402,40 @@ function renderReq(){
       row.append(sel,chatBtn(r),x);
     }else{row.appendChild(mk('span','chip',r.status||'baru'));row.appendChild(chatBtn(r))}
     if(NOTES.some(n=>!n.read&&n.reqId===r.id))row.appendChild(mk('span','chip new','Baru'));
-    d.appendChild(row);box.appendChild(d);
+    const rv=REV.find(x=>x.id===r.id);
+    if(!DEV&&(r.status||'baru')==='selesai'){
+      if(rv){row.appendChild(mk('span','chip rated','★ '+rv.rating+'/5'));row.appendChild(mk('span','note-s',rv.show?'Ulasanmu tampil di website':'Menunggu disetujui admin'))}
+      else{const rb=mk('button','main-btn sm','Beri ulasan');rb.type='button';rb.onclick=()=>openReview(r);row.appendChild(rb)}
+    }
+    d.appendChild(row);
+    if(DEV&&rv){
+      const rb=mk('div','rev');rb.appendChild(mk('div','stars',stars(rv.rating)+' · '+rv.name));
+      if(rv.text)rb.appendChild(mk('p','',rv.text));
+      const tb=mk('button','mini',rv.show?'Sembunyikan dari website':'Tampilkan di website');tb.type='button';
+      tb.onclick=()=>updateDoc(doc(db,'reviews',r.id),{show:!rv.show}).catch(e=>toast('Gagal: '+(e.code||e.message)));
+      rb.appendChild(tb);d.appendChild(rb);
+    }
+    box.appendChild(d);
   });
+}
+const stars=n=>{n=Math.max(0,Math.min(5,Math.round(+n||0)));return '★'.repeat(n)+'☆'.repeat(5-n)};
+function openReview(r){
+  let rating=0;
+  const body=mk('div'),sp=mk('div','starpick'),fn=field('Nama yang ditampilkan',(r.name||U.displayName||'').split(' ')[0]),ft=field('Ulasan (opsional)','',true,'Ceritakan pengalamanmu'),err=mk('p','err','');
+  const btns=[1,2,3,4,5].map(n=>{const b=mk('button','star','☆');b.type='button';b.setAttribute('aria-label',n+' bintang');b.onclick=()=>{rating=n;paint()};sp.appendChild(b);return b});
+  const paint=()=>btns.forEach((b,i)=>{b.textContent=i<rating?'★':'☆';b.classList.toggle('on',i<rating);b.setAttribute('aria-pressed',String(i<rating))});
+  body.append(mk('p','note','Beri nilai 1 sampai 5 bintang.'),sp,fn,ft,mk('p','note','Ulasanmu baru tampil di website setelah disetujui admin. Nama di atas ikut tampil.'),err);
+  openSheet({title:'Beri ulasan',body,ok:'Kirim ulasan',noFocus:true,
+    onOk(){
+      if(!rating){err.textContent='Pilih jumlah bintang dulu.';return false}
+      const name=(fn.input.value.trim()||'Pelanggan').slice(0,60),text=ft.input.value.trim();
+      if(text.length>500){err.textContent='Ulasan terlalu panjang (maksimal 500 huruf).';return false}
+      sOk.disabled=true;
+      setDoc(doc(db,'reviews',r.id),{uid:U.uid,name,rating,text,show:false,createdAt:serverTimestamp()})
+        .then(()=>{notify('dev',r.id,'Ulasan baru ★'+rating+' dari '+name);toast('Terima kasih atas ulasanmu!');closeSheet()})
+        .catch(e=>{sOk.disabled=false;err.textContent='Gagal mengirim: '+(e.code||e.message)});
+      return false;
+    }});
 }
 let BASE_TITLE=document.title;
 function notify(to,reqId,text){
@@ -438,7 +493,7 @@ function openChat(r){
       return false;
     }});
 }
-function renderAll(){renderTexts();renderPhoto();renderCover();renderProjects();renderPkgs();renderTesti();renderContacts();renderReq()}
+function renderAll(){renderTexts();renderPhoto();renderCover();renderProjects();renderPkgs();renderOpen();renderTesti();renderContacts();renderReq()}
 
 /* editor Dev */
 function editText(k){const f=field(LB[k]||'Teks',S.texts[k],ML[k]);openSheet({title:'Ubah teks',body:f,onOk(){S.texts[k]=f.input.value.trim();renderTexts();saveMain()}})}
@@ -511,6 +566,7 @@ function vipDone(text){
     onOk(){if(wa)window.open('https://wa.me/'+wa+'?text='+encodeURIComponent('Halo, saya '+(U.displayName||'pengunjung')+'. Saya sudah kirim request VIP: '+text+'\nBukti pembayaran menyusul.'),'_blank','noopener')}});
 }
 function openVip(pi){
+  if(S.open===false&&!DEV){toast('Request sedang ditutup. Silakan cek lagi nanti.');return}
   if(!U){
     openSheet({title:'Request VIP',body:mk('p','note','Masuk dulu dengan Google supaya request-mu tercatat dan statusnya bisa kamu pantau.'),ok:'Masuk dengan Google',noFocus:true,onOk(){login()}});
     return;
@@ -552,6 +608,7 @@ function openVip(pi){
     }});
 }
 $('vipBtn').onclick=()=>openVip();
+$('openToggle').onclick=()=>{S.open=(S.open===false);renderOpen();renderPkgs();saveMain()};
 $('addPkg').onclick=()=>openPkg(-1);
 $('addTesti').onclick=()=>openTesti(-1);
 renderAll();
