@@ -359,7 +359,9 @@ function renderTesti(){
     c.addEventListener('keydown',e=>{if(DEV&&e.key==='Enter'&&e.target===c)openTesti(i)});
     box.appendChild(c);
   });
-  PUB.forEach(x=>{const c=mk('figure','tcard');c.appendChild(mk('div','stars',stars(x.rating)));if(x.text)c.appendChild(mk('blockquote','',x.text));c.appendChild(mk('figcaption','',x.name));box.appendChild(c)});
+  PUB.forEach(x=>{const c=mk('figure','tcard');
+    if(DEV){c.tabIndex=0;c.setAttribute('role','button');c.setAttribute('aria-label','Kelola ulasan dari '+x.name);c.addEventListener('click',()=>openReviewAdmin(x));c.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target===c)openReviewAdmin(x)})}
+    c.appendChild(mk('div','stars',stars(x.rating)));if(x.text)c.appendChild(mk('blockquote','',x.text));c.appendChild(mk('figcaption','',x.name));box.appendChild(c)});
   const avg=$('avg');avg.hidden=!PUB.length;
   if(PUB.length)avg.textContent='★ '+(PUB.reduce((s,x)=>s+(+x.rating||0),0)/PUB.length).toFixed(1)+' dari 5 · '+PUB.length+' ulasan';
   $('testiSec').hidden=!S.testi.length&&!PUB.length&&!DEV;
@@ -398,7 +400,7 @@ function renderReq(){
         const t={dibayar:'Pembayaranmu sudah dikonfirmasi.',diproses:'Pesananmu sedang diproses.',selesai:'Pesananmu sudah selesai! Terima kasih.'}[sel.value];
         if(t)notify(r.uid,r.id,t);
       }).catch(e=>toast('Gagal: '+(e.code||e.message)));
-      const x=mk('button','mini','Hapus');x.type='button';x.onclick=()=>{if(x.dataset.s){deleteDoc(doc(db,'requests',r.id)).catch(()=>{})}else{x.dataset.s=1;x.textContent='Yakin? Ketuk lagi'}};
+      const x=mk('button','mini','Hapus');x.type='button';x.onclick=()=>{if(x.dataset.s){deleteDoc(doc(db,'requests',r.id)).then(()=>deleteDoc(doc(db,'reviews',r.id))).catch(()=>{})}else{x.dataset.s=1;x.textContent='Yakin? Ketuk lagi'}};
       row.append(sel,chatBtn(r),x);
     }else{row.appendChild(mk('span','chip',r.status||'baru'));row.appendChild(chatBtn(r))}
     if(NOTES.some(n=>!n.read&&n.reqId===r.id))row.appendChild(mk('span','chip new','Baru'));
@@ -417,6 +419,17 @@ function renderReq(){
     }
     box.appendChild(d);
   });
+}
+function openReviewAdmin(x){
+  const body=mk('div');
+  body.appendChild(mk('div','stars',stars(x.rating)+' · '+x.name));
+  if(x.text)body.appendChild(mk('p','',x.text));
+  body.appendChild(mk('p','note','Ulasan ini sedang tampil di website. Sembunyikan kalau hanya ingin menariknya dari halaman, atau hapus permanen.'));
+  const hide=mk('button','mini','Sembunyikan dari website');hide.type='button';
+  hide.onclick=()=>{updateDoc(doc(db,'reviews',x.id),{show:false}).catch(e=>toast('Gagal: '+(e.code||e.message)));closeSheet()};
+  body.appendChild(hide);
+  openSheet({title:'Ulasan pelanggan',body,ok:'Tutup',noFocus:true,del:true,delLabel:'Hapus ulasan',
+    onDel(){deleteDoc(doc(db,'reviews',x.id)).catch(e=>toast('Gagal menghapus: '+(e.code||e.message)))}});
 }
 const stars=n=>{n=Math.max(0,Math.min(5,Math.round(+n||0)));return '★'.repeat(n)+'☆'.repeat(5-n)};
 function openReview(r){
