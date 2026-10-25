@@ -161,15 +161,12 @@ input[type=range]{width:100%}
     <div class="vip">
       <h2 data-k="vipH"></h2>
       <p data-k="vipD"></p>
-      <h3 class="pk2h" id="vipPkH" data-k="vipPkH" hidden></h3>
-      <div class="pkgs" id="vipPkgs"></div>
-      <button class="mini add dev-only" id="addVipPkg" type="button" style="margin:0 0 1rem">+ Tambah paket VIP</button>
-      <p class="price" data-k="vipP"></p>
-      <div class="pkgs" id="pkgs"></div>
-      <button class="mini add dev-only" id="addPkg" type="button" style="margin:0 0 1rem">+ Tambah paket</button>
       <h3 class="pk2h" id="pk2H" data-k="pk2H" hidden></h3>
       <div class="pkgs" id="pkgs2"></div>
       <button class="mini add dev-only" id="addPkg2" type="button" style="margin:0 0 1rem">+ Tambah paket baru</button>
+      <p class="price" data-k="vipP"></p>
+      <div class="pkgs" id="pkgs"></div>
+      <button class="mini add dev-only" id="addPkg" type="button" style="margin:0 0 1rem">+ Tambah paket</button>
       <p class="pay"><span class="sans">Pembayaran:</span> <span data-k="vipPay"></span></p>
       <p class="note" id="closedNote" hidden>Request sedang ditutup. Silakan cek lagi nanti.</p>
       <div class="row">
@@ -216,9 +213,9 @@ const app=initializeApp({
 });
 const auth=getAuth(app),db=getFirestore(app);
 
-const DEF={texts:{name:'Nama Kamu',role:'Pekerjaan atau minat utama',tag:'Tulis satu kalimat tentang dirimu di sini.',aboutH:'Tentang saya',about:'Ceritakan dirimu secara singkat: siapa kamu, apa yang kamu kerjakan, dan apa yang kamu sukai.',projH:'Karya dan proyek',vipH:'Request VIP',vipD:'Mau dibuatkan karya khusus atau butuh prioritas? Kirim request VIP dan aku balas lebih dulu.',vipP:'Mulai Rp 50.000',vipPay:'Isi nama bank atau e-wallet, nomor, dan nama pemilik.',vipWa:'',contH:'Kontak',pk2H:'Paket baru',vipPkH:'Paket VIP',testiH:'Testimoni',termsH:'Syarat dan ketentuan',terms:'',priv:''},
+const DEF={texts:{name:'Nama Kamu',role:'Pekerjaan atau minat utama',tag:'Tulis satu kalimat tentang dirimu di sini.',aboutH:'Tentang saya',about:'Ceritakan dirimu secara singkat: siapa kamu, apa yang kamu kerjakan, dan apa yang kamu sukai.',projH:'Karya dan proyek',vipH:'Request VIP',vipD:'Mau dibuatkan karya khusus atau butuh prioritas? Kirim request VIP dan aku balas lebih dulu.',vipP:'Mulai Rp 50.000',vipPay:'Isi nama bank atau e-wallet, nomor, dan nama pemilik.',vipWa:'',contH:'Kontak',pk2H:'Paket baru',testiH:'Testimoni',termsH:'Syarat dan ketentuan',terms:'',priv:''},
   contacts:[{l:'Email',h:'mailto:namamu@email.com'},{l:'Instagram',h:'https://instagram.com/'}],photo:'',cover:'',packages:[],packages2:[],vipPackages:[],testi:[]};
-const LB={name:'Nama',role:'Pekerjaan atau minat',tag:'Kalimat pembuka',aboutH:'Judul bagian',about:'Tentang saya',projH:'Judul bagian',vipH:'Judul bagian',vipD:'Penjelasan VIP',vipP:'Harga',vipPay:'Info pembayaran',contH:'Judul bagian',pk2H:'Judul bagian',vipPkH:'Judul bagian',testiH:'Judul bagian',termsH:'Judul bagian',terms:'Syarat dan ketentuan',priv:'Catatan privasi'};
+const LB={name:'Nama',role:'Pekerjaan atau minat',tag:'Kalimat pembuka',aboutH:'Judul bagian',about:'Tentang saya',projH:'Judul bagian',vipH:'Judul bagian',vipD:'Penjelasan VIP',vipP:'Harga',vipPay:'Info pembayaran',contH:'Judul bagian',pk2H:'Judul bagian',testiH:'Judul bagian',termsH:'Judul bagian',terms:'Syarat dan ketentuan',priv:'Catatan privasi'};
 const ML={about:1,tag:1,vipD:1,vipPay:1,terms:1,priv:1};
 const STATUS=['baru','dibayar','diproses','selesai'];
 const $=id=>document.getElementById(id);
@@ -384,18 +381,16 @@ function renderOpen(){
   $('openToggle').textContent=open?'Tutup request':'Buka request';
 }
 function renderPkgs(){
-  const vp=document.querySelector('p.price');if(vp)vp.hidden=(S.packages.length+S.packages2.length)>0;
+  const vp=document.querySelector('p.price');if(vp)vp.hidden=S.packages2.length>0;
   drawPkgs($('pkgs'),S.packages,'p');
-  drawPkgs($('pkgs2'),S.packages2,'q');
+  drawVipPkgs($('pkgs2'),S.packages2,'q');
   $('pk2H').hidden=!(S.packages2.length||DEV);
-  drawVipPkgs($('vipPkgs'),S.vipPackages);
-  $('vipPkH').hidden=!(S.vipPackages.length||DEV);
 }
-function drawVipPkgs(box,arr){
+function drawVipPkgs(box,arr,g){
   box.textContent='';
   arr.forEach((p,i)=>{
     const c=mk('div','pkg');
-    if(DEV){c.tabIndex=0;c.setAttribute('role','button');c.setAttribute('aria-label','Ubah paket VIP '+p.n);c.addEventListener('click',()=>openPkg('v',i));c.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target===c)openPkg('v',i)})}
+    if(DEV){c.tabIndex=0;c.setAttribute('role','button');c.setAttribute('aria-label','Ubah paket VIP '+p.n);c.addEventListener('click',()=>openPkg(g,i));c.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target===c)openPkg(g,i)})}
     c.append(mk('h3','',p.n),mk('p','pp',p.p));
     if(p.t)c.appendChild(mk('span','chip',p.t));
     if(p.d)c.appendChild(mk('p','pd',p.d));
@@ -659,9 +654,9 @@ function openVip(pi,vip){
   const body=mk('div'),fn=field('Nama kamu',U.displayName||''),fr=field('Request kamu','',true,'Tulis karya atau layanan yang kamu mau'),err=mk('p','err','');
   const sw=mk('label','fl'),sel=document.createElement('select');
   const addGroup=(label,arr,g)=>{if(!arr.length)return;const og=document.createElement('optgroup');og.label=label;arr.forEach((p,i)=>{const o=mk('option','',p.n+' · '+p.p);o.value=g+i;og.appendChild(o)});sel.appendChild(og)};
-  if(vip){addGroup(S.texts.vipPkH||'Paket VIP',S.vipPackages,'v')}else{addGroup('Paket utama',S.packages,'p');addGroup(S.texts.pk2H||'Paket baru',S.packages2,'q')}
+  if(vip){addGroup(S.texts.pk2H||'Paket baru',S.packages2,'q')}else{addGroup('Paket utama',S.packages,'p')}
   const o2=mk('option','','Belum tahu, diskusi dulu');o2.value='-1';sel.appendChild(o2);
-  const all=vip?S.vipPackages.map((_,i)=>'v'+i):[...S.packages.map((_,i)=>'p'+i),...S.packages2.map((_,i)=>'q'+i)];
+  const all=vip?S.packages2.map((_,i)=>'q'+i):S.packages.map((_,i)=>'p'+i);
   sel.value=(typeof pi==='string'&&all.includes(pi))?pi:(all.length?all[0]:'-1');
   sw.append(mk('span','','Pilih paket'),sel);
   body.append(fn,sw,fr);
@@ -694,7 +689,6 @@ $('vipBtn').onclick=()=>openVip(undefined,true);
 $('openToggle').onclick=()=>{S.open=(S.open===false);renderOpen();renderPkgs();saveMain()};
 $('addPkg').onclick=()=>openPkg('p',-1);
 $('addPkg2').onclick=()=>openPkg('q',-1);
-$('addVipPkg').onclick=()=>openPkg('v',-1);
 $('addTesti').onclick=()=>openTesti(-1);
 renderAll();
 </script>
