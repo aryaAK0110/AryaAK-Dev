@@ -48,6 +48,8 @@ body.dev [data-k]:empty::before{content:"(ketuk untuk mengisi)";color:var(--mute
 @media(min-width:36rem){.pkgs{grid-template-columns:repeat(3,1fr)}}
 .pkg{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:1rem}
 .pkg h3{margin:0;font-size:1.05rem}
+.vipc{border:1.5px solid #FFC53D;background:color-mix(in srgb,#FFC53D 10%,var(--card))}
+.vipc .chip:first-child{background:#1C2541;color:#FFC53D;margin-bottom:.4rem}
 .pp{font-family:"Bricolage Grotesque",system-ui,sans-serif;font-weight:800;font-size:1.3rem;margin:.2rem 0 .4rem}
 .pd{color:var(--muted);font-size:.95rem;margin:.5rem 0 .8rem;white-space:pre-line}
 .main-btn.sm{padding:.45rem 1rem;font-size:.9rem}
@@ -158,6 +160,11 @@ input[type=range]{width:100%}
     <button class="mini add dev-only" id="addTesti" type="button">+ Tambah testimoni</button>
   </section>
   <section>
+    <h2 data-k="pkH" id="pkH" hidden></h2>
+    <div class="pkgs" id="pkgs"></div>
+    <button class="mini add dev-only" id="addPkg" type="button" style="margin:0 0 1rem">+ Tambah paket</button>
+  </section>
+  <section>
     <div class="vip">
       <h2 data-k="vipH"></h2>
       <p data-k="vipD"></p>
@@ -165,8 +172,6 @@ input[type=range]{width:100%}
       <div class="pkgs" id="pkgs2"></div>
       <button class="mini add dev-only" id="addPkg2" type="button" style="margin:0 0 1rem">+ Tambah paket baru</button>
       <p class="price" data-k="vipP"></p>
-      <div class="pkgs" id="pkgs"></div>
-      <button class="mini add dev-only" id="addPkg" type="button" style="margin:0 0 1rem">+ Tambah paket</button>
       <p class="pay"><span class="sans">Pembayaran:</span> <span data-k="vipPay"></span></p>
       <p class="note" id="closedNote" hidden>Request sedang ditutup. Silakan cek lagi nanti.</p>
       <div class="row">
@@ -213,9 +218,9 @@ const app=initializeApp({
 });
 const auth=getAuth(app),db=getFirestore(app);
 
-const DEF={texts:{name:'Nama Kamu',role:'Pekerjaan atau minat utama',tag:'Tulis satu kalimat tentang dirimu di sini.',aboutH:'Tentang saya',about:'Ceritakan dirimu secara singkat: siapa kamu, apa yang kamu kerjakan, dan apa yang kamu sukai.',projH:'Karya dan proyek',vipH:'Request VIP',vipD:'Mau dibuatkan karya khusus atau butuh prioritas? Kirim request VIP dan aku balas lebih dulu.',vipP:'Mulai Rp 50.000',vipPay:'Isi nama bank atau e-wallet, nomor, dan nama pemilik.',vipWa:'',contH:'Kontak',pk2H:'Paket baru',testiH:'Testimoni',termsH:'Syarat dan ketentuan',terms:'',priv:''},
+const DEF={texts:{name:'Nama Kamu',role:'Pekerjaan atau minat utama',tag:'Tulis satu kalimat tentang dirimu di sini.',aboutH:'Tentang saya',about:'Ceritakan dirimu secara singkat: siapa kamu, apa yang kamu kerjakan, dan apa yang kamu sukai.',projH:'Karya dan proyek',vipH:'Request VIP',vipD:'Mau dibuatkan karya khusus atau butuh prioritas? Kirim request VIP dan aku balas lebih dulu.',vipP:'Mulai Rp 50.000',vipPay:'Isi nama bank atau e-wallet, nomor, dan nama pemilik.',vipWa:'',contH:'Kontak',pkH:'Paket',pk2H:'Paket baru',testiH:'Testimoni',termsH:'Syarat dan ketentuan',terms:'',priv:''},
   contacts:[{l:'Email',h:'mailto:namamu@email.com'},{l:'Instagram',h:'https://instagram.com/'}],photo:'',cover:'',packages:[],packages2:[],vipPackages:[],testi:[]};
-const LB={name:'Nama',role:'Pekerjaan atau minat',tag:'Kalimat pembuka',aboutH:'Judul bagian',about:'Tentang saya',projH:'Judul bagian',vipH:'Judul bagian',vipD:'Penjelasan VIP',vipP:'Harga',vipPay:'Info pembayaran',contH:'Judul bagian',pk2H:'Judul bagian',testiH:'Judul bagian',termsH:'Judul bagian',terms:'Syarat dan ketentuan',priv:'Catatan privasi'};
+const LB={name:'Nama',role:'Pekerjaan atau minat',tag:'Kalimat pembuka',aboutH:'Judul bagian',about:'Tentang saya',projH:'Judul bagian',vipH:'Judul bagian',vipD:'Penjelasan VIP',vipP:'Harga',vipPay:'Info pembayaran',contH:'Judul bagian',pkH:'Judul bagian',pk2H:'Judul bagian',testiH:'Judul bagian',termsH:'Judul bagian',terms:'Syarat dan ketentuan',priv:'Catatan privasi'};
 const ML={about:1,tag:1,vipD:1,vipPay:1,terms:1,priv:1};
 const STATUS=['baru','dibayar','diproses','selesai'];
 const $=id=>document.getElementById(id);
@@ -385,13 +390,14 @@ function renderPkgs(){
   drawPkgs($('pkgs'),S.packages,'p');
   drawVipPkgs($('pkgs2'),S.packages2,'q');
   $('pk2H').hidden=!(S.packages2.length||DEV);
+  $('pkH').hidden=!(S.packages.length||DEV);
 }
 function drawVipPkgs(box,arr,g){
   box.textContent='';
   arr.forEach((p,i)=>{
-    const c=mk('div','pkg');
+    const c=mk('div','pkg vipc');
     if(DEV){c.tabIndex=0;c.setAttribute('role','button');c.setAttribute('aria-label','Ubah paket VIP '+p.n);c.addEventListener('click',()=>openPkg(g,i));c.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target===c)openPkg(g,i)})}
-    c.append(mk('h3','',p.n),mk('p','pp',p.p));
+    c.append(mk('span','chip','VIP'),mk('h3','',p.n),mk('p','pp',p.p));
     if(p.t)c.appendChild(mk('span','chip',p.t));
     if(p.d)c.appendChild(mk('p','pd',p.d));
     box.appendChild(c);
