@@ -129,6 +129,9 @@ input[type=range]{width:100%}
 .bell{position:relative;display:inline-grid;place-items:center;width:2.2rem;height:2.2rem;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer;padding:0}
 .dot{position:absolute;top:-.35rem;right:-.35rem;min-width:1.15rem;height:1.15rem;padding:0 .25rem;border-radius:999px;background:#E5484D;color:#fff;font-size:.7rem;font-weight:700;display:grid;place-items:center}
 .ni{display:block;width:100%;text-align:left;font:inherit;font-size:1rem;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:.7rem .9rem;margin-bottom:.6rem;cursor:pointer}
+.nrow{display:flex;gap:.4rem;align-items:stretch;margin-bottom:.6rem}
+.nrow .ni{flex:1;margin-bottom:0}
+.nx{font:inherit;font-size:.8rem;font-weight:600;background:transparent;color:var(--muted);border:1px solid var(--line);border-radius:10px;padding:0 .7rem;cursor:pointer}
 .ni.unread{border-color:var(--gold);box-shadow:inset 3px 0 0 var(--gold)}
 .ni small{display:block;font-family:"Bricolage Grotesque",system-ui,sans-serif;font-size:.75rem;color:var(--muted);margin-top:.2rem}
 .chip.new{background:#E5484D;color:#fff;margin-left:.3rem}
@@ -590,14 +593,20 @@ function openNotes(){
   const body=mk('div');
   if(!NOTES.length)body.appendChild(mk('p','note','Belum ada pemberitahuan.'));
   NOTES.slice(0,40).forEach(n=>{
+    const row=mk('div','nrow');
     const b=mk('button','ni'+(n.read?'':' unread'),n.text);b.type='button';
     const when=n.createdAt&&n.createdAt.toDate?n.createdAt.toDate().toLocaleString('id-ID'):'';
     b.appendChild(mk('small','',when));
     b.onclick=()=>{markRead(n);const r=REQ.find(x=>x.id===n.reqId);if(r)openChat(r);else closeSheet()};
-    body.appendChild(b);
+    const x=mk('button','nx','Hapus');x.type='button';x.setAttribute('aria-label','Hapus pemberitahuan');
+    x.onclick=()=>deleteDoc(doc(db,'notifications',n.id)).then(()=>row.remove()).catch(e=>toast('Gagal menghapus: '+(e.code||e.message)));
+    row.append(b,x);body.appendChild(row);
   });
+  const hasRead=NOTES.some(n=>n.read);
   openSheet({title:'Pemberitahuan',body,ok:'Tandai semua dibaca',cancelLabel:'Tutup',noFocus:true,
-    onOk(){NOTES.filter(n=>!n.read).forEach(markRead);return false}});
+    del:hasRead,delLabel:'Hapus yang sudah dibaca',
+    onOk(){NOTES.filter(n=>!n.read).forEach(markRead);return false},
+    onDel(){NOTES.filter(n=>n.read).forEach(n=>deleteDoc(doc(db,'notifications',n.id)).catch(()=>{}));toast('Pemberitahuan yang sudah dibaca dihapus.')}});
 }
 $('bell').onclick=openNotes;
 function chatBtn(r){const b=mk('button','mini','Chat');b.type='button';b.onclick=()=>openChat(r);return b}
