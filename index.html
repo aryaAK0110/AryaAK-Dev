@@ -172,6 +172,17 @@ input[type=range]{width:100%}
 .vimg{flex:0 0 100%;width:100%;height:100%;object-fit:contain;scroll-snap-align:center;padding:calc(3.2rem + env(safe-area-inset-top,0px)) .5rem 3rem;filter:none}
 .vx{position:absolute;top:calc(.6rem + env(safe-area-inset-top,0px));right:.8rem;z-index:2;width:2.6rem;height:2.6rem;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:rgba(0,0,0,.4);color:#fff;font-size:1.5rem;line-height:1;cursor:pointer}
 .vcount{position:absolute;bottom:calc(1rem + env(safe-area-inset-bottom,0px));left:0;right:0;text-align:center;color:#F4ECD8;font-family:"Bricolage Grotesque",system-ui,sans-serif;font-size:.9rem}
+.banner{margin:.8rem 0 0;padding:.6rem .9rem;border-radius:12px;background:color-mix(in srgb,var(--gold) 14%,var(--card));border:1px solid color-mix(in srgb,var(--gold) 45%,var(--line));font-family:"Bricolage Grotesque",system-ui,sans-serif;font-size:.92rem;font-weight:600;color:var(--ink);cursor:default}
+body.dev .banner{cursor:pointer}
+.banner:empty::before{content:'Ketuk untuk menulis pengumuman';color:var(--muted);font-weight:500}
+.avail.slots{margin-left:.5rem}
+.avail.slots.off::before{background:#E5484D}
+.banner{animation:bannerIn .7s ease-out both}
+@keyframes bannerIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:none}}
+.avail.slots{font-variant-numeric:tabular-nums}
+.avail:not(.off)::before{animation:pulseDot 2.2s ease-in-out infinite}
+@keyframes pulseDot{0%,100%{box-shadow:0 0 0 0 rgba(95,208,138,.55)}50%{box-shadow:0 0 0 .45rem rgba(95,208,138,0)}}
+@media (prefers-reduced-motion:reduce){.banner,.avail:not(.off)::before{animation:none!important}}
 </style>
 </head>
 <body>
@@ -179,6 +190,7 @@ input[type=range]{width:100%}
 <div class="glow g2" aria-hidden="true"></div>
 <canvas id="stars" aria-hidden="true"></canvas>
 <main>
+  <p class="banner" id="announce" data-k="announce" hidden></p>
   <div class="top"><span class="badge dev-only">Mode Dev</span><button class="bell" id="bell" type="button" aria-label="Notifikasi" hidden><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><span class="dot" id="dot" hidden></span></button><span id="who"></span><button class="mini" id="auth" type="button">Masuk dengan Google</button></div>
   <button class="cover" id="cover" type="button" aria-label="Foto sampul" hidden><img id="coverImg" alt="" hidden><span id="coverPh">+ Foto sampul</span></button>
   <header id="hd">
@@ -187,6 +199,7 @@ input[type=range]{width:100%}
     <p class="role" data-k="role"></p>
     <p class="tag" data-k="tag"></p>
     <p class="avail" id="avail" hidden></p>
+    <p class="avail" id="slots" hidden></p>
     <p class="note" id="statsBox" hidden></p>
     <p class="hint dev-only">Mode Dev: ketuk teks, foto, atau kartu mana pun untuk mengubahnya. Perubahan langsung tampil ke semua pengunjung.</p>
   </header>
@@ -221,6 +234,7 @@ input[type=range]{width:100%}
         <button class="main-btn" id="vipBtn" type="button">Request VIP</button>
         <button class="mini dev-only" id="vipSet" type="button">Atur nomor WhatsApp</button>
         <button class="mini dev-only" id="openToggle" type="button"></button>
+        <button class="mini dev-only" id="slotSet" type="button">Atur slot</button>
       </div>
     </div>
   </section>
@@ -261,9 +275,9 @@ const app=initializeApp({
 });
 const auth=getAuth(app),db=getFirestore(app);
 
-const DEF={texts:{name:'Nama Kamu',role:'Pekerjaan atau minat utama',tag:'Tulis satu kalimat tentang dirimu di sini.',aboutH:'Tentang saya',about:'Ceritakan dirimu secara singkat: siapa kamu, apa yang kamu kerjakan, dan apa yang kamu sukai.',projH:'Karya dan proyek',vipH:'Request VIP',vipD:'Mau dibuatkan karya khusus atau butuh prioritas? Kirim request VIP dan aku balas lebih dulu.',vipP:'Mulai Rp 50.000',vipPay:'Isi nama bank atau e-wallet, nomor, dan nama pemilik.',vipWa:'',contH:'Kontak',pkH:'Paket',pk2H:'Paket baru',testiH:'Testimoni',termsH:'Syarat dan ketentuan',terms:'',priv:''},
-  contacts:[{l:'Email',h:'mailto:namamu@email.com'},{l:'Instagram',h:'https://instagram.com/'}],photo:'',cover:'',packages:[],packages2:[],vipPackages:[],testi:[]};
-const LB={name:'Nama',role:'Pekerjaan atau minat',tag:'Kalimat pembuka',aboutH:'Judul bagian',about:'Tentang saya',projH:'Judul bagian',vipH:'Judul bagian',vipD:'Penjelasan VIP',vipP:'Harga',vipPay:'Info pembayaran',contH:'Judul bagian',pkH:'Judul bagian',pk2H:'Judul bagian',testiH:'Judul bagian',termsH:'Judul bagian',terms:'Syarat dan ketentuan',priv:'Catatan privasi'};
+const DEF={texts:{name:'Nama Kamu',role:'Pekerjaan atau minat utama',tag:'Tulis satu kalimat tentang dirimu di sini.',aboutH:'Tentang saya',about:'Ceritakan dirimu secara singkat: siapa kamu, apa yang kamu kerjakan, dan apa yang kamu sukai.',projH:'Karya dan proyek',vipH:'Request VIP',vipD:'Mau dibuatkan karya khusus atau butuh prioritas? Kirim request VIP dan aku balas lebih dulu.',vipP:'Mulai Rp 50.000',vipPay:'Isi nama bank atau e-wallet, nomor, dan nama pemilik.',vipWa:'',contH:'Kontak',pkH:'Paket',pk2H:'Paket baru',announce:'',testiH:'Testimoni',termsH:'Syarat dan ketentuan',terms:'',priv:''},
+  contacts:[{l:'Email',h:'mailto:namamu@email.com'},{l:'Instagram',h:'https://instagram.com/'}],photo:'',cover:'',packages:[],packages2:[],vipPackages:[],slots:null,testi:[]};
+const LB={name:'Nama',role:'Pekerjaan atau minat',tag:'Kalimat pembuka',aboutH:'Judul bagian',about:'Tentang saya',projH:'Judul bagian',vipH:'Judul bagian',vipD:'Penjelasan VIP',vipP:'Harga',vipPay:'Info pembayaran',contH:'Judul bagian',pkH:'Judul bagian',pk2H:'Judul bagian',announce:'Pengumuman',testiH:'Judul bagian',termsH:'Judul bagian',terms:'Syarat dan ketentuan',priv:'Catatan privasi'};
 const ML={about:1,tag:1,vipD:1,vipPay:1,terms:1,priv:1};
 const STATUS=['baru','dibayar','diproses','selesai'];
 const $=id=>document.getElementById(id);
@@ -275,7 +289,7 @@ function toast(m){const t=$('toast');t.textContent=m;t.hidden=false;clearTimeout
 let FILTER='semua',S=clone(DEF),P=[],U=null,DEV=false,REQ=[],unReq=null,NOTES=[],unNote=null,REV=[],PUB=[],unRev=null;
 
 /* data */
-function norm(d){const x=clone(DEF);x.texts=Object.assign(x.texts,d.texts||{});x.contacts=d.contacts||x.contacts;x.photo=d.photo||'';x.cover=d.cover||'';x.open=d.open!==false;x.packages=Array.isArray(d.packages)?d.packages:[];x.packages2=Array.isArray(d.packages2)?d.packages2:[];x.vipPackages=Array.isArray(d.vipPackages)?d.vipPackages:[];x.testi=Array.isArray(d.testi)?d.testi:[];return x}
+function norm(d){const x=clone(DEF);x.texts=Object.assign(x.texts,d.texts||{});x.contacts=d.contacts||x.contacts;x.photo=d.photo||'';x.cover=d.cover||'';x.open=d.open!==false;x.packages=Array.isArray(d.packages)?d.packages:[];x.packages2=Array.isArray(d.packages2)?d.packages2:[];x.vipPackages=Array.isArray(d.vipPackages)?d.vipPackages:[];x.slots=(d.slots===undefined)?null:d.slots;x.testi=Array.isArray(d.testi)?d.testi:[];return x}
 async function saveMain(){try{await setDoc(doc(db,'site','main'),S)}catch(e){toast('Gagal menyimpan: '+(e.code||e.message))}}
 onSnapshot(doc(db,'site','main'),s=>{S=s.exists()?norm(s.data()):clone(DEF);renderTexts();renderPhoto();renderCover();renderPkgs();renderOpen();renderTesti();renderContacts()},()=>{});
 onSnapshot(query(collection(db,'projects'),orderBy('order')),s=>{P=s.docs.map(d=>Object.assign({id:d.id},d.data()));renderProjects()},()=>{});
@@ -470,6 +484,19 @@ function renderOpen(){
   $('closedNote').hidden=open;
   $('openToggle').textContent=open?'Tutup request':'Buka request';
   const av=$('avail');av.hidden=false;av.textContent=open?'Sedang menerima request':'Penuh untuk sementara';av.classList.toggle('off',!open);
+  const sl=$('slots');sl.hidden=S.slots==null;
+  if(S.slots!=null){
+    const target=S.slots;const ttxt=n=>n>0?'Sisa '+n+' slot':'Slot penuh untuk sementara';
+    sl.classList.toggle('off',target<=0);
+    if(REDUCE||target<=0){sl.textContent=ttxt(target)}
+    else if(sl._shown!==target){
+      const t0=performance.now(),dur=700;
+      const step=t=>{const k=Math.min(1,(t-t0)/dur),n=Math.max(1,Math.round(target*(1-Math.pow(1-k,3))));sl.textContent='Sisa '+n+' slot';if(k<1)requestAnimationFrame(step);else sl.textContent=ttxt(target)};
+      requestAnimationFrame(step);
+    }
+    sl._shown=target;
+  }
+  const an=$('announce');an.hidden=!(S.texts.announce||DEV);
 }
 function renderPkgs(){
   const vp=document.querySelector('p.price');if(vp)vp.hidden=S.packages2.length>0;
@@ -784,6 +811,7 @@ function openVip(pi,vip){
     }});
 }
 $('vipBtn').onclick=()=>openVip(undefined,true);
+$('slotSet').onclick=()=>{const f=field('Sisa slot (kosongkan untuk menyembunyikan)',S.slots==null?'':S.slots,false,'Contoh: 2');openSheet({title:'Atur slot',body:f,onOk(){const v=f.input.value.trim();S.slots=v===''?null:Math.max(0,parseInt(v,10)||0);renderOpen();saveMain()}})};
 $('openToggle').onclick=()=>{S.open=(S.open===false);renderOpen();renderPkgs();saveMain()};
 $('addPkg').onclick=()=>openPkg('p',-1);
 $('addPkg2').onclick=()=>openPkg('q',-1);
