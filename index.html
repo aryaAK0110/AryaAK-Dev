@@ -183,6 +183,9 @@ body.dev .banner{cursor:pointer}
 .avail:not(.off)::before{animation:pulseDot 2.2s ease-in-out infinite}
 @keyframes pulseDot{0%,100%{box-shadow:0 0 0 0 rgba(95,208,138,.55)}50%{box-shadow:0 0 0 .45rem rgba(95,208,138,0)}}
 @media (prefers-reduced-motion:reduce){.banner,.avail:not(.off)::before{animation:none!important}}
+.banner{display:flex;align-items:center;gap:.6rem}
+.ann-t{flex:1;min-width:0}
+.bx{flex:0 0 auto;width:1.8rem;height:1.8rem;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--ink);font-size:1.1rem;line-height:1;cursor:pointer}
 </style>
 </head>
 <body>
@@ -190,7 +193,8 @@ body.dev .banner{cursor:pointer}
 <div class="glow g2" aria-hidden="true"></div>
 <canvas id="stars" aria-hidden="true"></canvas>
 <main>
-  <p class="banner" id="announce" data-k="announce" hidden></p>
+  <div class="banner" id="announce" hidden><span class="ann-t" data-k="announce"></span><button class="bx" id="annX" type="button" aria-label="Tutup pengumuman">×</button></div>
+  <button class="mini" id="annAdd" type="button" hidden style="margin:.8rem 0 0">+ Pengumuman</button>
   <div class="top"><span class="badge dev-only">Mode Dev</span><button class="bell" id="bell" type="button" aria-label="Notifikasi" hidden><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><span class="dot" id="dot" hidden></span></button><span id="who"></span><button class="mini" id="auth" type="button">Masuk dengan Google</button></div>
   <button class="cover" id="cover" type="button" aria-label="Foto sampul" hidden><img id="coverImg" alt="" hidden><span id="coverPh">+ Foto sampul</span></button>
   <header id="hd">
@@ -496,7 +500,8 @@ function renderOpen(){
     }
     sl._shown=target;
   }
-  const an=$('announce');an.hidden=!(S.texts.announce||DEV);
+  const has=!!S.texts.announce;let seen=false;try{seen=localStorage.getItem('aak_ann')===S.texts.announce}catch(e){}
+  $('announce').hidden=!has||seen;$('annAdd').hidden=has||!DEV;
 }
 function renderPkgs(){
   const vp=document.querySelector('p.price');if(vp)vp.hidden=S.packages2.length>0;
@@ -696,7 +701,7 @@ function openChat(r){
 function renderAll(){renderTexts();renderPhoto();renderCover();renderProjects();renderPkgs();renderOpen();renderTesti();renderContacts();renderReq()}
 
 /* editor Dev */
-function editText(k){const f=field(LB[k]||'Teks',S.texts[k],ML[k]);openSheet({title:'Ubah teks',body:f,onOk(){S.texts[k]=f.input.value.trim();renderTexts();saveMain()}})}
+function editText(k){const f=field(LB[k]||'Teks',S.texts[k],ML[k]);openSheet({title:'Ubah teks',body:f,onOk(){S.texts[k]=f.input.value.trim();renderTexts();renderOpen();saveMain()}})}
 document.addEventListener('click',e=>{const t=e.target.closest('[data-k]');if(DEV&&t)editText(t.dataset.k)});
 document.addEventListener('keydown',e=>{if(DEV&&e.key==='Enter'&&e.target.dataset&&e.target.dataset.k)editText(e.target.dataset.k)});
 function openCard(p,tmp){
@@ -811,6 +816,8 @@ function openVip(pi,vip){
     }});
 }
 $('vipBtn').onclick=()=>openVip(undefined,true);
+$('annAdd').onclick=()=>editText('announce');
+$('annX').onclick=e=>{e.stopPropagation();try{localStorage.setItem('aak_ann',S.texts.announce)}catch(err){}$('announce').hidden=true};
 $('slotSet').onclick=()=>{const f=field('Sisa slot (kosongkan untuk menyembunyikan)',S.slots==null?'':S.slots,false,'Contoh: 2');openSheet({title:'Atur slot',body:f,onOk(){const v=f.input.value.trim();S.slots=v===''?null:Math.max(0,parseInt(v,10)||0);renderOpen();saveMain()}})};
 $('openToggle').onclick=()=>{S.open=(S.open===false);renderOpen();renderPkgs();saveMain()};
 $('addPkg').onclick=()=>openPkg('p',-1);
