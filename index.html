@@ -186,6 +186,7 @@ body.dev .banner{cursor:pointer}
 .banner{display:flex;align-items:center;gap:.6rem}
 .ann-t{flex:1;min-width:0}
 .bx{flex:0 0 auto;width:1.8rem;height:1.8rem;border-radius:50%;border:1px solid var(--line);background:transparent;color:var(--ink);font-size:1.1rem;line-height:1;cursor:pointer}
+body.dev .bx{display:none}
 </style>
 </head>
 <body>
@@ -501,7 +502,7 @@ function renderOpen(){
     sl._shown=target;
   }
   const has=!!S.texts.announce;let seen=false;try{seen=localStorage.getItem('aak_ann')===S.texts.announce}catch(e){}
-  $('announce').hidden=!has||seen;$('annAdd').hidden=has||!DEV;
+  $('announce').hidden=!has||(seen&&!DEV);$('annAdd').hidden=has||!DEV;
 }
 function renderPkgs(){
   const vp=document.querySelector('p.price');if(vp)vp.hidden=S.packages2.length>0;
