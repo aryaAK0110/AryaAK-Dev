@@ -145,6 +145,7 @@ input[type=range]{width:100%}
     <h1 data-k="name"></h1>
     <p class="role" data-k="role"></p>
     <p class="tag" data-k="tag"></p>
+    <p class="note" id="statsBox" hidden></p>
     <p class="hint dev-only">Mode Dev: ketuk teks, foto, atau kartu mana pun untuk mengubahnya. Perubahan langsung tampil ke semua pengunjung.</p>
   </header>
   <section><h2 data-k="aboutH"></h2><p data-k="about"></p></section>
@@ -206,7 +207,7 @@ input[type=range]{width:100%}
 <script type="module">
 import {initializeApp} from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
 import {getAuth,GoogleAuthProvider,signInWithPopup,signOut,onAuthStateChanged} from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
-import {getFirestore,doc,getDoc,setDoc,onSnapshot,collection,addDoc,updateDoc,deleteDoc,query,where,orderBy,serverTimestamp} from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
+import {getFirestore,doc,getDoc,setDoc,onSnapshot,collection,addDoc,updateDoc,deleteDoc,query,where,orderBy,serverTimestamp,increment} from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
 const app=initializeApp({
   apiKey:"AIzaSyA4TncTjWI3shVkIAygnx1e5pCnZk5eSN4",
@@ -240,6 +241,30 @@ onSnapshot(query(collection(db,'reviews'),where('show','==',true)),s=>{PUB=s.doc
 
 /* auth */
 const provider=new GoogleAuthProvider();
+/* statistik kunjungan: per perangkat, sekali per hari */
+const TODAY=()=>{const d=new Date();return d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')};
+function deviceId(){try{let v=localStorage.getItem('aak_vid');if(!v){v=(crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2)+Date.now().toString(36));localStorage.setItem('aak_vid',v)}return v}catch(e){return ''}}
+async function trackVisit(){
+  const vid=deviceId();if(!vid)return;
+  const day=TODAY();
+  try{
+    const vref=doc(db,'visitors',vid);
+    const snap=await getDoc(vref);
+    if(snap.exists()&&snap.data().day===day)return;
+    if(snap.exists()){await updateDoc(vref,{day})}else{await setDoc(vref,{day})}
+    await setDoc(doc(db,'stats','main'),{total:increment(1),unique:increment(snap.exists()?0:1)},{merge:true});
+    await setDoc(doc(db,'stats','d_'+day),{views:increment(1),devices:increment(1)},{merge:true});
+  }catch(e){}
+}
+let statsOn=false;
+function startStats(){
+  if(statsOn)return;statsOn=true;
+  let m={},d={};
+  const paint=()=>{$('statsBox').textContent='Pengunjung · Hari ini: '+(d.views||0)+' kunjungan ('+(d.devices||0)+' perangkat) · Total: '+(m.total||0)+' · Perangkat unik: '+(m.unique||0)};
+  onSnapshot(doc(db,'stats','main'),s=>{m=s.exists()?s.data():{};paint()},()=>{});
+  onSnapshot(doc(db,'stats','d_'+TODAY()),s=>{d=s.exists()?s.data():{};paint()},()=>{});
+}
+trackVisit();
 async function login(){try{await signInWithPopup(auth,provider)}catch(e){if(e.code!=='auth/popup-closed-by-user'&&e.code!=='auth/cancelled-popup-request')toast('Gagal masuk: '+(e.code||e.message))}}
 $('auth').onclick=()=>U?signOut(auth):login();
 onAuthStateChanged(auth,async u=>{
@@ -247,6 +272,7 @@ onAuthStateChanged(auth,async u=>{
   if(unReq){unReq();unReq=null}REQ=[];if(unNote){unNote();unNote=null}NOTES=[];if(unRev){unRev();unRev=null}REV=[];
   if(u){try{await getDoc(doc(db,'admin','check'));DEV=true}catch(e){}}
   document.body.classList.toggle('dev',DEV);
+  $('statsBox').hidden=!DEV;if(DEV)startStats();
   $('who').textContent=u?(u.displayName||u.email):'';
   $('auth').textContent=u?'Keluar':'Masuk dengan Google';
   if(u){
