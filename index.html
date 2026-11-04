@@ -163,6 +163,15 @@ input[type=range]{width:100%}
 @keyframes shine{from{left:-80%}to{left:140%}}
 .gal img,.pimg{filter:sepia(.16) saturate(1.04) contrast(1.02)}
 @media (prefers-reduced-motion:reduce){#vipBtn::after{animation:none!important;display:none}}
+.avail{display:inline-flex;align-items:center;gap:.45rem;font-family:"Bricolage Grotesque",system-ui,sans-serif;font-size:.85rem;font-weight:600;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:.3rem .8rem;margin-top:.9rem}
+.avail::before{content:'';width:.5rem;height:.5rem;border-radius:50%;background:#5FD08A}
+.avail.off::before{background:#E5484D}
+.viewer{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.94);display:flex;flex-direction:column}
+.vtrack{flex:1;min-height:0;display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none}
+.vtrack::-webkit-scrollbar{display:none}
+.vimg{flex:0 0 100%;width:100%;height:100%;object-fit:contain;scroll-snap-align:center;padding:calc(3.2rem + env(safe-area-inset-top,0px)) .5rem 3rem;filter:none}
+.vx{position:absolute;top:calc(.6rem + env(safe-area-inset-top,0px));right:.8rem;z-index:2;width:2.6rem;height:2.6rem;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:rgba(0,0,0,.4);color:#fff;font-size:1.5rem;line-height:1;cursor:pointer}
+.vcount{position:absolute;bottom:calc(1rem + env(safe-area-inset-bottom,0px));left:0;right:0;text-align:center;color:#F4ECD8;font-family:"Bricolage Grotesque",system-ui,sans-serif;font-size:.9rem}
 </style>
 </head>
 <body>
@@ -177,6 +186,7 @@ input[type=range]{width:100%}
     <h1 data-k="name"></h1>
     <p class="role" data-k="role"></p>
     <p class="tag" data-k="tag"></p>
+    <p class="avail" id="avail" hidden></p>
     <p class="note" id="statsBox" hidden></p>
     <p class="hint dev-only">Mode Dev: ketuk teks, foto, atau kartu mana pun untuk mengubahnya. Perubahan langsung tampil ke semua pengunjung.</p>
   </header>
@@ -411,6 +421,22 @@ function autoGallery(){
   });
 }
 if(!REDUCE)setInterval(autoGallery,3500);
+function openViewer(urls,start){
+  const v=mk('div','viewer');v.setAttribute('role','dialog');v.setAttribute('aria-modal','true');v.setAttribute('aria-label','Foto karya');
+  const close=mk('button','vx','×');close.type='button';close.setAttribute('aria-label','Tutup');
+  const track=mk('div','vtrack'),cnt=mk('div','vcount','');
+  urls.forEach((u,i)=>{const im=mk('img','vimg');im.src=u;im.alt='Foto '+(i+1)+' dari '+urls.length;track.appendChild(im)});
+  v.append(close,track,cnt);document.body.appendChild(v);
+  document.body.style.overflow='hidden';
+  const upd=()=>{const i=Math.round(track.scrollLeft/track.clientWidth);cnt.textContent=(i+1)+' / '+urls.length};
+  const key=e=>{if(e.key==='Escape')shut()};
+  function shut(){v.remove();document.body.style.overflow='';document.removeEventListener('keydown',key)}
+  track.addEventListener('scroll',upd,{passive:true});
+  close.onclick=shut;
+  v.addEventListener('click',e=>{if(e.target===v||e.target===track)shut()});
+  document.addEventListener('keydown',key);
+  requestAnimationFrame(()=>{track.scrollLeft=start*track.clientWidth;upd()});
+}
 function renderProjects(){
   const box=$('projects');box.textContent='';
   P.forEach(p=>{
@@ -419,6 +445,7 @@ function renderProjects(){
     if(imgs.length){
       const g=mk('div','gal');
       imgs.forEach((u,i)=>{const im=mk('img');im.src=u;im.alt='Foto '+(p.t||'')+' '+(i+1);g.appendChild(im)});
+      g.addEventListener('click',e=>{if(e.target.tagName!=='IMG')return;e.stopPropagation();openViewer(imgs,[...g.children].indexOf(e.target)%imgs.length)});
       if(imgs.length>1){const c=g.children[0].cloneNode(true);c.alt='';c.setAttribute('aria-hidden','true');g.appendChild(c);g._n=imgs.length}
       a.appendChild(g);
       if(imgs.length>1){
@@ -442,6 +469,7 @@ function renderOpen(){
   b.textContent=open?'Request VIP':(DEV?'Request VIP (ditutup)':'Request ditutup');
   $('closedNote').hidden=open;
   $('openToggle').textContent=open?'Tutup request':'Buka request';
+  const av=$('avail');av.hidden=false;av.textContent=open?'Sedang menerima request':'Penuh untuk sementara';av.classList.toggle('off',!open);
 }
 function renderPkgs(){
   const vp=document.querySelector('p.price');if(vp)vp.hidden=S.packages2.length>0;
