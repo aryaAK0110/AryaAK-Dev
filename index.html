@@ -152,6 +152,14 @@ input[type=range]{width:100%}
   section,.proj,.pkg,.tcard{animation:none!important;transition:none!important}
   .proj:hover,.pkg:hover,.tcard:hover{transform:none}
 }
+#vipBtn{position:relative;overflow:hidden}
+#vipBtn::after{content:'';position:absolute;top:0;left:-80%;width:45%;height:100%;background:linear-gradient(100deg,rgba(255,240,190,0),rgba(255,240,190,.55),rgba(255,240,190,0));transform:skewX(-20deg);pointer-events:none}
+@media (hover:hover){#vipBtn:not(:disabled):hover::after{animation:shine .9s ease-out 1}}
+#vipBtn:not(:disabled):active::after{animation:shine .9s ease-out 1}
+#vipBtn:disabled::after{display:none}
+@keyframes shine{from{left:-80%}to{left:140%}}
+.gal img,.pimg{filter:sepia(.16) saturate(1.04) contrast(1.02)}
+@media (prefers-reduced-motion:reduce){#vipBtn::after{animation:none!important;display:none}}
 </style>
 </head>
 <body>
