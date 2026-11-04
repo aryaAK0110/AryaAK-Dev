@@ -759,7 +759,7 @@ renderAll();
   const cv=$('stars');if(!cv||!cv.getContext)return;
   const ctx=cv.getContext('2d');
   let W=0,H=0,DPR=1,P=[],raf=0;
-  const N=innerWidth<600?28:44;
+  const N=44;
   function size(){DPR=Math.min(devicePixelRatio||1,1.5);W=cv.clientWidth;H=cv.clientHeight;cv.width=W*DPR;cv.height=H*DPR;ctx.setTransform(DPR,0,0,DPR,0,0)}
   function seed(){P=Array.from({length:N},()=>({x:Math.random()*W,y:Math.random()*H,r:0.6+Math.random()*1.6,vy:0.05+Math.random()*0.18,vx:(Math.random()-0.5)*0.08,a:Math.random()*Math.PI*2,sp:0.01+Math.random()*0.02}))}
   function frame(){
